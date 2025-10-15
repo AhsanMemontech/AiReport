@@ -45,9 +45,11 @@ app.post('/api/generate-report', async (req, res) => {
 
     // Generate AI report
     const report = await generateAIReport(formData);
+
+    const cleanReport = report.replace(/[*#]/g, '')  
     
     // Generate PDF
-    const pdfURL = await generateAndUploadPDF(report, formData);
+    const pdfURL = await generateAndUploadPDF(cleanReport, formData);
     
     // Send email with PDF attachment
     await sendEmailWithPDFReport(contact.contact.id, formData, pdfURL);
@@ -268,14 +270,13 @@ async function sendEmailWithPDFReport(contactId, formData, pdfUrl) {
       contactId: contactId,
       subject: process.env.EMAIL_SUBJECT || "Your AI Business Report",
       html: `
-          <p>Hello ${formData.firstName},</p>
+          <p>Hello ${formData.firstName.split(' ')[0]},</p>
           <p>Your personalized business report is attached to this email.</p>
           <p>Best regards,<br>Edwards</p>
         `,
       to: formData.email,
       from: process.env.EMAIL_FROM,
       attachments: [
-        //`${process.env.BASE_URL}/public/Business_AI_Report.pdf`
         pdfUrl
       ]
     };
