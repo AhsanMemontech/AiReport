@@ -233,7 +233,7 @@ async function generateAndUploadPDF(reportText, formData) {
   });
 
   // 2️⃣ Upload PDF to Supabase Storage
-  const fileName = `Business_AI_Report_${Date.now()}.pdf`;
+  const fileName = `${formData.businessName.replace(/\s+/g, '_')}.pdf`;
   const { data, error } = await supabase
     .storage
     .from('reports') // your bucket name
@@ -258,7 +258,8 @@ async function generateAndUploadPDF(reportText, formData) {
 // Function to send email with PDF attachment using GHL API
 async function sendEmailWithPDFReport(contactId, formData, pdfUrl) {
   try {  
-    pdfUrl = `${process.env.SUPABASE_URL}/storage/v1/object/public/reports/${formData.businessName}.pdf`
+    const fileName = `${formData.businessName.replace(/\s+/g, '_')}.pdf`;
+    pdfUrl = `${process.env.SUPABASE_URL}/storage/v1/object/public/reports/${fileName}`
     console.log(pdfUrl);
 
     // Prepare message data for GHL Conversations API
