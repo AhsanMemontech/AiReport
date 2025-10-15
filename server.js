@@ -2,13 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const axios = require('axios');
+const { createClient } = require('@supabase/supabase-js');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 
 // Load environment variables
 dotenv.config();
-
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 // Initialize Express app
 const app = express();
 //app.use('/public', express.static(path.join(process.cwd(), 'public')));
@@ -46,10 +47,10 @@ app.post('/api/generate-report', async (req, res) => {
     const report = await generateAIReport(formData);
     
     // Generate PDF
-    const pdfPath = await generatePDF(report, formData);
+    const pdfURL = await generateAndUploadPDF(report, formData);
     
     // Send email with PDF attachment
-    await sendEmailWithPDFReport(contact.contact.id, formData, report, pdfPath);
+    await sendEmailWithPDFReport(contact.contact.id, formData, pdfURL);
     
     // Clean up - delete the temporary PDF file
     //fs.unlinkSync(pdfPath);
@@ -206,62 +207,60 @@ async function generateAIReport(formData) {
   }
 }
 
-// Function to generate PDF from report text
-async function generatePDF(reportText, formData) {
-  return new Promise((resolve, reject) => {
-    try {
-      // Create a temporary file path
-      const pdfPath = path.join(process.cwd(), 'public', 'Business_AI_Report.pdf');
-      
-      console.log(pdfPath);
-      // Create a new PDF document
-      const doc = new PDFDocument();
-      const stream = fs.createWriteStream(pdfPath);
-      
-      // Pipe the PDF to the file
-      doc.pipe(stream);
-      
-      // Add title
-      doc.fontSize(20)
-      .text("Business Analysis Report", { align: 'center' })
-      .moveDown(2);
-      
-      // Add business info
-      doc.fontSize(12)
-      .text(`Business Name: ${formData.businessName || 'Not provided'}`)
-      .text(`Business Type: ${formData.businessType || 'Not provided'}`)
-      .text(`Website: ${formData.websiteLink || 'Not provided'}`)
-      .moveDown(2);
-      
-      // Add report content
-      doc.fontSize(10)
-      .text(reportText, { align: 'left' });
-      
-      // Finalize the PDF
-      doc.end();
-      
-      // When the stream is finished, resolve with the file path
-      stream.on('finish', () => {
-          resolve(pdfPath);
-        });
-        
-        stream.on('error', (error) => {
-            reject(error);
-        });
-      
-    } catch (error) {
-      reject(error);
-    }
+async function generateAndUploadPDF(reportText, formData) {
+  // 1️⃣ Generate PDF in-memory
+  const doc = new PDFDocument();
+  const chunks = [];
+
+  doc.on('data', chunk => chunks.push(chunk));
+  doc.on('end', async () => {});
+
+  doc.fontSize(20).text("Business Analysis Report", { align: 'center' }).moveDown(2);
+  doc.fontSize(12)
+    .text(`Business Name: ${formData.businessName || 'N/A'}`)
+    .text(`Business Type: ${formData.businessType || 'N/A'}`)
+    .text(`Website: ${formData.websiteLink || 'N/A'}`)
+    .moveDown(2);
+  doc.fontSize(10).text(reportText, { align: 'left' });
+
+  doc.end();
+
+  const pdfBuffer = await new Promise((resolve, reject) => {
+    const result = [];
+    doc.on('data', (chunk) => result.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(result)));
+    doc.on('error', reject);
   });
+
+  // 2️⃣ Upload PDF to Supabase Storage
+  const fileName = `Business_AI_Report_${Date.now()}.pdf`;
+  const { data, error } = await supabase
+    .storage
+    .from('reports') // your bucket name
+    .upload(fileName, pdfBuffer, {
+      contentType: 'application/pdf',
+      upsert: true,
+    });
+
+  if (error) throw error;
+
+  // 3️⃣ Get public URL
+  const { publicUrl, error: urlError } = supabase
+    .storage
+    .from('reports')
+    .getPublicUrl(fileName);
+
+  if (urlError) throw urlError;
+
+  return publicUrl;
 }
 
 // Function to send email with PDF attachment using GHL API
-async function sendEmailWithPDFReport(contactId, formData, report, pdfPath) {
-  try {
-    // Read the PDF file and convert to base64
-    const pdfBuffer = fs.readFileSync(pdfPath);
-    const base64PDF = pdfBuffer.toString('base64');
-    
+async function sendEmailWithPDFReport(contactId, formData, pdfUrl) {
+  try {  
+    pdfUrl = `${process.env.SUPABASE_URL}/storage/v1/object/public/reports/${formData.businessName}.pdf`
+    console.log(pdfUrl);
+
     // Prepare message data for GHL Conversations API
     const messageData = {
       type: "Email",
@@ -275,7 +274,8 @@ async function sendEmailWithPDFReport(contactId, formData, report, pdfPath) {
       to: formData.email,
       from: process.env.EMAIL_FROM,
       attachments: [
-        `${process.env.BASE_URL}/public/Business_AI_Report.pdf`
+        //`${process.env.BASE_URL}/public/Business_AI_Report.pdf`
+        pdfUrl
       ]
     };
     
