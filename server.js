@@ -40,7 +40,7 @@ app.post('/api/generate-report', async (req, res) => {
       formData.firstName = "Undefined"
     }
     if(!formData.lastName){
-      formData.lastName = "Undefined"
+      formData.lastName = "test@example.com"
     }
     if(!formData.phone){
       formData.phone = "+1 (804) 222-1111"
