@@ -6,6 +6,7 @@ const { createClient } = require('@supabase/supabase-js');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
+const cheerio = require('cheerio');
 
 // Load environment variables
 dotenv.config();
@@ -119,71 +120,115 @@ async function createContact(formData){
     return responseData
 }
 
+/**
+ * Fetch and extract visible text from a website for AI analysis.
+ * Cleans out scripts, menus, and redundant text.
+ */
+async function fetchWebsiteContent(url) {
+  try {
+    const { data } = await axios.get(url, {
+      timeout: 10000, // 10 sec timeout
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (AI Analyzer Bot)',
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
+    });
+
+    const $ = cheerio.load(data);
+
+    // Remove scripts, styles, nav, and footer
+    $('script, style, nav, footer, noscript').remove();
+
+    // Get main textual content
+    const text = $('body').text();
+    const cleaned = text
+      .replace(/\s+/g, ' ')
+      .replace(/([^\x00-\x7F]|\r|\n)/g, ' ') // remove non-ASCII
+      .trim();
+
+    // Limit to ~6000 chars (about 1500 tokens)
+    return cleaned.slice(0, 6000);
+
+  } catch (err) {
+    console.error(`Error fetching website: ${url}`, err.message);
+    return "Website content could not be fetched.";
+  }
+}
+
 // Function to generate AI report using OpenAI
 async function generateAIReport(formData) {
   try {
-    const prompt = `
-        You are an AI business advisor who specializes in helping small local businesses use AI to grow revenue, save time, and improve customer experience.
-        I will give you:
+    //const websiteText = await fetchWebsiteContent(formData.websiteLink);
 
-        - The business name
-        - The business website (if available)
+    console.log("websiteText", websiteText);
+    
+    const prompt=`
+      You are an AI business analyst that helps companies uncover high-impact ways to use AI.
 
-        Use this information to create a 100% tailored “AI Opportunity Report” for this business.
-        The report should be specific, clear, actionable, and realistic — written for a non-technical business ownerwith 1-50 employees.
+      The user will give you a company website URL.
+      Your job is to analyze that website and produce a concise, structured report showing exactly where AI can create measurable impact — fast.
 
-        Inputs:
-        Business name: ${formData.businessName || 'N/A'}
-        Website: ${formData.websiteLink || 'N/A'}
+      ${formData.websiteLink}
 
-        REPORT STRUCTURE:
-        1. Introduction
-        Explain what's happening in their market right now with AI.
-        Use plain language and give 2-3 examples of how businesses like theirs are already using AI.
-        Mention how fast AI adoption is growing (reference current data or trend percentages).
-        2. The Threats
-        Outline the key business risks and challenges if they ignore AI.
-        Include:
-        Competitors using AI to attract more customers
-        Clients expecting faster service, better communication, and 24/7 responsiveness
-        Time and cost pressures
-        The danger of losing local market share and lower business valuation
-        3. Why It's Hard for Small Businesses
-        Explain that small business owners rarely get practical help with AI.
-        Mention:
-        Most IT consultants focus on websites, not business growth
-        AI advice online is too technical
-        Business owners are too busy to learn new tools
-        Emphasize: this is not about tech — it's about smarter business operations.
-        4. Big Opportunities
-        Give 3-5 clear, realistic ideas for how this specific type of business could use AI.
-        Each idea should include:
-        The AI tool or approach (e.g. lead follow-up automation, customer service chat, scheduling, marketing, reporting)
-        The benefit (e.g. “turn missed calls into booked jobs,” “free up 10 hours a week,” “increase repeat business”)
-        Use examples relevant to ${formData.websiteLink || 'N/A'}.
-        5. The Payoff
-        Explain what happens if they start small now.
-        Use bullet points and numbers where possible:
-        20-50% time savings
-        30-200% more leads from better marketing
-        Less stress for the team
-        Happier customers and higher business value
-        6. Call to Action
-        End with an encouraging paragraph.
-        Reinforce that they don't need to become an AI expert — they just need to start now.
-        Mention that you (the sender) can help them take the next steps if they want.
+      Follow these steps carefully:
 
-        Tone:
-        Friendly and expert, not salesy
-        No jargon
-        Grade 6 reading level
-        Short paragraphs and bullet points
-        American English
+      ⸻
 
-        Output:
-        Return as a full written report titled:
-        “Your AI Opportunity Report — For ${formData.businessName || 'N/A'}"
-        Use clear formatting with subheadings and spacing and dont include * or # in heading on points.
+      Step 1. Identify Core Details
+
+      From the website, determine:
+        •	Industry / Niche
+        •	Primary Location or Service Area
+        •	Core Offering — what they actually sell or do
+        •	Target Audience / Customer Type
+
+      ⸻
+
+      Step 2. Diagnose Typical Pain Points
+
+      List 4-5 major problems that companies in this niche commonly face.
+      For each problem:
+        •	Summarize it in one sentence.
+        •	Use supporting data or benchmarks from credible sources (industry reports, statistics, or case studies).
+        •	Keep numbers simple and clear (e.g., “average law firm loses 20% of billable hours to admin work”).
+
+      ⸻
+
+      Step 3. Match Each Problem to a Specific AI Solution
+
+      For each problem, describe:
+        •	A specific AI-driven solution that directly addresses it.
+        •	How quickly it can be implemented (e.g., “can be live within 7 days”).
+        •	The tangible outcome (time saved, cost reduced, revenue gained, or risk lowered).
+
+      ⸻
+
+      Step 4. Deliver Action-Oriented Framing
+
+      Add a short paragraph that:
+        •	Reinforces that these issues can be solved fast — often in days or weeks, not months.
+        •	Positions AI as a competitive advantage for their specific type of business.
+
+      ⸻
+
+      Step 5. Call to Action
+
+      End with:
+
+      “To explore how these solutions can be implemented in your business within days, contact us at ${process.env.EMAIL_FROM}.”
+
+      ⸻
+
+      Output Format
+
+      Respond in Markdown with:
+        1.	Industry Summary
+        2.	Location & Core Offering
+        3.	Top 5 Problems & AI Solutions
+        4.	Conclusion & Call to Action
+
+      Tone: professional, practical, and data-backed. No hype.
+      Keep it under 1000 words total
     `;
     
     const response = await axios.post(
@@ -193,7 +238,7 @@ async function generateAIReport(formData) {
         messages: [
           {
             role: "system",
-            content: "You are an expert AI risk analyst and business consultant."
+            content: "You are an AI business analyst that helps companies uncover high-impact ways to use AI."
           },
           {
             role: "user",
@@ -283,7 +328,7 @@ async function sendEmailWithPDFReport(contactId, formData, pdfUrl) {
             <p>Your personalized business report is attached to this email.</p>
             <p>Best regards,<br><strong>Edwards</strong></p>
 
-            <div style="text-align: left; margin-bottom: 20px;">
+            <div style="text-align: left; margin-bottom: 10px; margin-bottom: 10px;">
               <img src="${process.env.SUPABASE_URL}/storage/v1/object/public/reports/The_Local_AI_Squad_Logo.png" 
               alt="Company Logo" width="150" style="border-radius: 8px;" />
             </div>
