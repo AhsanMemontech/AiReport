@@ -86,12 +86,11 @@ app.post('/api/generate-report', async (req, res) => {
 
 // Create contact in GoHighLevel
 async function createContact(formData){
-    const { email, firstName, lastName, phone } = formData;
-    const name = `${firstName} ${lastName}`.trim();
+    const { firstName, email, phone } = formData;
     
     const contactData = {
+      name: firstName.trim(),
       email: email.toLowerCase().trim(),
-      name: name.trim(),
       phone: phone,
       tags: ['AI Opportunity Report']
     }
@@ -159,8 +158,7 @@ async function fetchWebsiteContent(url) {
 async function generateAIReport(formData) {
   try {
     //const websiteText = await fetchWebsiteContent(formData.websiteLink);
-
-    console.log("websiteText", websiteText);
+    console.log("websiteLink", formData.websiteLink)
     
     const prompt=`
       You are an AI business analyst that helps companies uncover high-impact ways to use AI.
