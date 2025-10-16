@@ -35,6 +35,16 @@ app.post('/api/generate-report', async (req, res) => {
   try {
     console.log("Request Body:", req.body);
     const formData = req.body;
+
+    if(!formData.firstName){
+      formData.firstName = "Undefined"
+    }
+    if(!formData.lastName){
+      formData.lastName = "Undefined"
+    }
+    if(!formData.phone){
+      formData.phone = "+1 (804) 222-1111"
+    }
     
     // Validate required fields
     if (!formData.firstName || !formData.email || !formData.phone) {
