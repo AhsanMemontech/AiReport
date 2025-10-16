@@ -127,7 +127,6 @@ async function generateAIReport(formData) {
         I will give you:
 
         - The business name
-        - The business type
         - The business website (if available)
 
         Use this information to create a 100% tailored “AI Opportunity Report” for this business.
@@ -135,7 +134,6 @@ async function generateAIReport(formData) {
 
         Inputs:
         Business name: ${formData.businessName || 'N/A'}
-        Business type: ${formData.businessType || 'N/A'}
         Website: ${formData.websiteLink || 'N/A'}
 
         REPORT STRUCTURE:
@@ -162,7 +160,7 @@ async function generateAIReport(formData) {
         Each idea should include:
         The AI tool or approach (e.g. lead follow-up automation, customer service chat, scheduling, marketing, reporting)
         The benefit (e.g. “turn missed calls into booked jobs,” “free up 10 hours a week,” “increase repeat business”)
-        Use examples relevant to ${formData.businessType || 'N/A'}.
+        Use examples relevant to ${formData.websiteLink || 'N/A'}.
         5. The Payoff
         Explain what happens if they start small now.
         Use bullet points and numbers where possible:
@@ -231,7 +229,6 @@ async function generateAndUploadPDF(reportText, formData) {
   doc.fontSize(20).text("Business Analysis Report", { align: 'center' }).moveDown(2);
   doc.fontSize(12)
     .text(`Business Name: ${formData.businessName || 'N/A'}`)
-    .text(`Business Type: ${formData.businessType || 'N/A'}`)
     .text(`Website: ${formData.websiteLink || 'N/A'}`)
     .moveDown(2);
   doc.fontSize(10).text(reportText, { align: 'left' });
@@ -281,9 +278,16 @@ async function sendEmailWithPDFReport(contactId, formData, pdfUrl) {
       contactId: contactId,
       subject: process.env.EMAIL_SUBJECT || "Your AI Business Report",
       html: `
-          <p>Hello ${formData.firstName.split(' ')[0]},</p>
-          <p>Your personalized business report is attached to this email.</p>
-          <p>Best regards,<br>Edwards</p>
+          <div style="font-family: Arial, sans-serif; color: #333;">
+            <p>Hello ${formData.firstName.split(' ')[0]},</p>
+            <p>Your personalized business report is attached to this email.</p>
+            <p>Best regards,<br><strong>Edwards</strong></p>
+
+            <div style="text-align: center; margin-bottom: 20px;">
+              <img src="${process.env.SUPABASE_URL}/storage/v1/object/public/reports/The_Local_AI_Squad_Logo.png" 
+              alt="Company Logo" width="150" style="border-radius: 8px;" />
+            </div>
+          </div>
         `,
       to: formData.email,
       from: process.env.EMAIL_FROM,
