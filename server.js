@@ -33,6 +33,7 @@ app.use(express.json());
 // API endpoint to generate report and send email
 app.post('/api/generate-report', async (req, res) => {
   try {
+    console.log("Request Body:", req.body);
     const formData = req.body;
     
     // Validate required fields
