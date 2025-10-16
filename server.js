@@ -283,7 +283,7 @@ async function sendEmailWithPDFReport(contactId, formData, pdfUrl) {
             <p>Your personalized business report is attached to this email.</p>
             <p>Best regards,<br><strong>Edwards</strong></p>
 
-            <div style="text-align: center; margin-bottom: 20px;">
+            <div style="text-align: left; margin-bottom: 20px;">
               <img src="${process.env.SUPABASE_URL}/storage/v1/object/public/reports/The_Local_AI_Squad_Logo.png" 
               alt="Company Logo" width="150" style="border-radius: 8px;" />
             </div>
